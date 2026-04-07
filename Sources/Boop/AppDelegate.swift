@@ -42,12 +42,22 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         let menu = NSMenu()
-        menu.addItem(NSMenuItem(title: "● Active — \(permissionStore.mode.displayName)",
-                                action: nil, keyEquivalent: ""))
+        let activeItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
+        let activeString = NSMutableAttributedString()
+        activeString.append(NSAttributedString(string: "●  ", attributes: [
+            .foregroundColor: NSColor(red: 0.055, green: 0.733, blue: 0.514, alpha: 1.0),
+            .font: NSFont.systemFont(ofSize: 12)
+        ]))
+        activeString.append(NSAttributedString(string: "Active", attributes: [
+            .foregroundColor: NSColor.labelColor,
+            .font: NSFont.systemFont(ofSize: 13)
+        ]))
+        activeItem.attributedTitle = activeString
+        menu.addItem(activeItem)
         menu.addItem(.separator())
-        menu.addItem(NSMenuItem(title: "Settings…", action: #selector(openSettings), keyEquivalent: ","))
+        menu.addItem(NSMenuItem(title: "Settings…", action: #selector(openSettings), keyEquivalent: ""))
         menu.addItem(.separator())
-        menu.addItem(NSMenuItem(title: "Quit Boop", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
+        menu.addItem(NSMenuItem(title: "Quit Boop", action: #selector(NSApplication.terminate(_:)), keyEquivalent: ""))
 
         statusItem.menu = menu
     }
@@ -55,6 +65,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func openSettings() {
         NSApp.activate(ignoringOtherApps: true)
         settingsController.showSettings(store: storeObservable)
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        SleepManager.shared.releaseAll()
     }
 
     // MARK: - HTTP server

@@ -14,7 +14,7 @@ private let kNotificationSounds = [
 
 private enum SettingsTab: String, CaseIterable {
     case consentMode = "Consent Mode"
-    case notifications = "Notifications"
+    case preferences = "Preferences"
 }
 
 // MARK: - Brand colour
@@ -55,6 +55,7 @@ struct SettingsView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .frame(width: 480, height: 484)
+        .ignoresSafeArea()
         .background(Color(NSColor.windowBackgroundColor))
     }
 
@@ -65,8 +66,8 @@ struct SettingsView: View {
         switch selectedTab {
         case .consentMode:
             permissionModeSection
-        case .notifications:
-            notificationsAndPermissionsSection
+        case .preferences:
+            preferencesSection
         }
     }
 
@@ -86,75 +87,59 @@ struct SettingsView: View {
         .padding(.vertical, 16)
     }
 
-    // MARK: - Notifications & Permissions (merged)
+    // MARK: - Preferences
 
-    private var notificationsAndPermissionsSection: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Notifications")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(.secondary)
+    private var preferencesSection: some View {
+        VStack(spacing: 12) {
+            HStack {
+                Label("Show toast for auto-approved tools", systemImage: "checkmark.bubble")
+                    .font(.system(size: 13))
+                Spacer()
+                Toggle("", isOn: $store.showAutoApproveToast)
+                    .toggleStyle(.switch)
+                    .labelsHidden()
+            }
 
-                VStack(spacing: 12) {
-                    HStack {
-                        Label("Show toast for auto-approved tools", systemImage: "checkmark.bubble")
-                            .font(.system(size: 13))
-                        Spacer()
-                        Toggle("", isOn: $store.showAutoApproveToast)
-                            .toggleStyle(.switch)
-                            .labelsHidden()
+            Divider()
+
+            HStack {
+                Label("Alert sound", systemImage: "speaker.wave.2")
+                    .font(.system(size: 13))
+                Spacer()
+                Picker("", selection: $store.notificationSound) {
+                    ForEach(kNotificationSounds, id: \.self) { sound in
+                        Text(sound).tag(sound)
                     }
-
-                    Divider()
-
-                    HStack {
-                        Label("Alert sound", systemImage: "speaker.wave.2")
-                            .font(.system(size: 13))
-                        Spacer()
-                        Picker("", selection: $store.notificationSound) {
-                            ForEach(kNotificationSounds, id: \.self) { sound in
-                                Text(sound).tag(sound)
-                            }
-                        }
-                        .pickerStyle(.menu)
-                        .frame(width: 130)
-                        .onChange(of: store.notificationSound) { sound in
-                            NSSound(named: .init(sound))?.play()
-                        }
-                    }
+                }
+                .pickerStyle(.menu)
+                .frame(width: 130)
+                .onChange(of: store.notificationSound) { sound in
+                    NSSound(named: .init(sound))?.play()
                 }
             }
 
-            VStack(alignment: .leading, spacing: 8) {
-                Text("System")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(.secondary)
+            Divider()
 
-                VStack(spacing: 10) {
-                    HStack {
-                        Label("Launch Boop at login", systemImage: "arrow.clockwise.circle")
-                            .font(.system(size: 13))
-                        Spacer()
-                        Toggle("", isOn: $store.launchAtLogin)
-                            .toggleStyle(.switch)
-                            .labelsHidden()
-                    }
-
-                    Divider()
-
-                    Button {
-                        let configDir = FileManager.default.homeDirectoryForCurrentUser
-                            .appendingPathComponent(".boop")
-                        NSWorkspace.shared.open(configDir)
-                    } label: {
-                        Label("Reveal config file", systemImage: "folder")
-                            .font(.system(size: 13))
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                    .foregroundColor(.secondary)
-                    .buttonStyle(.plain)
-                }
+            HStack {
+                Label("Prevent sleep while Claude is active", systemImage: "moon.zzz")
+                    .font(.system(size: 13))
+                Spacer()
+                Toggle("", isOn: $store.preventSleep)
+                    .toggleStyle(.switch)
+                    .labelsHidden()
             }
+
+            Divider()
+
+            HStack {
+                Label("Launch Boop at login", systemImage: "arrow.clockwise.circle")
+                    .font(.system(size: 13))
+                Spacer()
+                Toggle("", isOn: $store.launchAtLogin)
+                    .toggleStyle(.switch)
+                    .labelsHidden()
+            }
+
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 16)
@@ -216,8 +201,9 @@ struct SettingsView: View {
                 Spacer()
             }
             .padding(.horizontal, 20)
+            .padding(.top, 26)
         }
-        .frame(height: 72)
+        .frame(height: 95)
         .onAppear {
             startWinkCycle()
         }
@@ -316,6 +302,15 @@ class PermissionStoreObservable: ObservableObject {
     @Published var showAutoApproveToast: Bool = true {
         didSet { underlyingStore.showAutoApproveToast = showAutoApproveToast }
     }
+    @Published var preventSleep: Bool {
+        didSet {
+            try? underlyingStore.setPreventSleep(preventSleep)
+            SleepManager.shared.autoPreventSleep = preventSleep
+            if !preventSleep && !SleepManager.shared.manualOverride {
+                SleepManager.shared.releaseAll()
+            }
+        }
+    }
     @Published var launchAtLogin: Bool = false {
         didSet {
             if launchAtLogin {
@@ -332,7 +327,10 @@ class PermissionStoreObservable: ObservableObject {
     init(store: PermissionStore) {
         self.underlyingStore = store
         self.mode = store.mode
+        self.preventSleep = store.preventSleep
         self.launchAtLogin = SMAppService.mainApp.status == .enabled
         self.notificationSound = store.notificationSound
+        // Sync initial state to SleepManager
+        SleepManager.shared.autoPreventSleep = store.preventSleep
     }
 }

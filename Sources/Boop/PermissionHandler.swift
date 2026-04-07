@@ -15,6 +15,9 @@ class PermissionHandler {
     }
 
     func handle(payload: PermissionPayload, respond: @escaping (HookResponse) -> Void) {
+        // Signal activity to keep the Mac awake
+        SleepManager.shared.recordActivity()
+
         let category = ToolCategory.from(toolName: payload.tool_name)
 
         // Fast path: already allowed (permanent, smart scope, or session)

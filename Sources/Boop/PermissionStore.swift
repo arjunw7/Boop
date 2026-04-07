@@ -12,10 +12,12 @@ class PermissionStore {
     struct Config: Codable {
         var mode: PermissionMode
         var notificationSound: String
+        var preventSleep: Bool
 
         init() {
             mode = .default
             notificationSound = "Ping"
+            preventSleep = true
         }
     }
 
@@ -28,9 +30,15 @@ class PermissionStore {
 
     var mode: PermissionMode { config.mode }
     var notificationSound: String { config.notificationSound }
+    var preventSleep: Bool { config.preventSleep }
 
     func setNotificationSound(_ sound: String) throws {
         config.notificationSound = sound
+        try save()
+    }
+
+    func setPreventSleep(_ enabled: Bool) throws {
+        config.preventSleep = enabled
         try save()
     }
 
